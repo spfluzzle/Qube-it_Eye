@@ -17,42 +17,59 @@ using namespace std;
 
 
 
-Scalar scalBluLO = Scalar(100,0,0);
-Scalar scalBluHI = Scalar(255,150,150);
-Scalar scalGrnLO = Scalar(0,80,0);
-Scalar scalGrnHI = Scalar(80,255,80);
-Scalar scalRedLO = Scalar(0,0,100);
-Scalar scalRedHI = Scalar(100,100,255);
+Scalar scalBlkLO = Scalar(0,0,0);
+Scalar scalBlkHI = Scalar(30,30,30);
+
 
 int main(int argc, const char * argv[]) {
     
-    //VideoCapture capture(0);
-    Mat imgOrig, imgRed, imgBlu, imgGrn;
+    VideoCapture capture(0);
+    Mat imgOrig, imgFlip, imgEdit0, imgEdit1, black;
     
-    //cout << argv[1];
-    
-    string filename = "/Users/Stephen/Desktop/Stephengine/Apple Tutorials/Qube-it_Eye/build/Debug/BGR.jpg";
-    cout << filename;
-    
-    //namedWindow("test0", WINDOW_AUTOSIZE);
-    
-    //Mat test0(200, 200, CV_8UC1, Scalar(100,100,100));
-    //imshow("test0", test0);
-    //imshow("test", imread("BGR.jpg"));
-
-    imgOrig = imread(filename, CV_LOAD_IMAGE_COLOR);   // Read the file
-    if(imgOrig.empty()){cout << "you suck"; return -1;}
-    
-        /*capture >> imgOrig;
-        flip(imgOrig, imgFlip, 1);*/
+    while(true) {
         
-    namedWindow("orig", WINDOW_NORMAL);
-    fprintf(stderr, "data is %p\n", imgOrig.data);
+    vector<vector<Point> > contours;
+    vector<Rect> rects;
     
-    imshow("orig", imgOrig);
-
     
-    cin.ignore();
+    capture >> imgOrig;
+    flip(imgOrig, imgFlip, 1);
     
+    inRange(imgFlip, scalBlkLO, scalBlkHI, black);
+    
+    Mat can, con;
+    
+    erode(black, imgEdit0, 0);
+    dilate(imgEdit0, imgEdit1, 0);
+    dilate(imgEdit1, imgEdit0, 0);
+        
+    Canny(imgEdit0, can, 50, 200);
+        
+    findContours(can, contours, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE);
+    
+    Point br;
+    for(int i = 0; i < contours.size(); i++) {
+        rects.push_back(boundingRect(contours.at(i)));
+        br = Point(rects.at(i).x + rects.at(i).width, rects.at(i).y + rects.at(i).height);
+        rectangle(imgFlip, rects.at(i).tl(), br, Scalar(155,155,155));
+    }
+    
+    if(rects.size() > 0) {
+        int largeRect = 0;
+        double compare = 0;
+        compare = rects.at(0).size().area();
+        for(int i = 1; i < rects.size(); i++) {
+            if(rects.at(i).size().area() > compare) {
+                    compare = rects.at(i).size().area();
+                    largeRect = i;
+                }
+            }
+            cout << (rects.at(largeRect).x + rects.at(largeRect).width/2) << endl;
+        }
+    
+        imshow("orig", imgFlip);
+    }
     return 0;
 }
+
+
