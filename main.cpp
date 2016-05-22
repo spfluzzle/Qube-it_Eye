@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <cstdio>
+#include <curl/curl.h>
 #include "opencv2/core/core.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
@@ -26,6 +27,16 @@ int main(int argc, const char * argv[]) {
     VideoCapture capture(0);
     Mat imgOrig, imgFlip, imgEdit0, imgEdit1, black;
     
+    CURL *curl;
+  
+    curl_global_init(CURL_GLOBAL_ALL);
+ 
+    curl = curl_easy_init();
+    struct curl_slist *headers = NULL;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    int version = 0;
+
     while(true) {
         
     vector<vector<Point> > contours;
@@ -34,6 +45,7 @@ int main(int argc, const char * argv[]) {
     
     capture >> imgOrig;
     flip(imgOrig, imgFlip, 1);
+    int maxPosition = imgOrig.rows;
     
     inRange(imgFlip, scalBlkLO, scalBlkHI, black);
     
@@ -54,6 +66,7 @@ int main(int argc, const char * argv[]) {
         rectangle(imgFlip, rects.at(i).tl(), br, Scalar(155,155,155));
     }
     
+    int position = -1;
     if(rects.size() > 0) {
         int largeRect = 0;
         double compare = 0;
@@ -64,10 +77,43 @@ int main(int argc, const char * argv[]) {
                     largeRect = i;
                 }
             }
-            cout << (rects.at(largeRect).x + rects.at(largeRect).width/2) << endl;
-        }
+	position = (rects.at(largeRect).x + rects.at(largeRect).width/2);
+            cout << position << endl;
+
+	    
+    }
+
+    if (position > maxPosition) {
+      position = maxPosition;
+    }
+
+    if (curl) {
+      curl_easy_setopt(curl, CURLOPT_URL, "http://concelo.io:8080/");
+//       curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
+
+      std::stringstream json;
+
+      json << "{ \"value\": " << (((double) position) / ((double) maxPosition)) << ", \"version\": " << version << " }"; 
+
+      ++ version;
+
+      std::string s = json.str();
+      const char* c = s.c_str();
+       
+      fprintf(stderr, "%d/%d json is %s\n", position, maxPosition, c);
+
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDS, c);
+      curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, s.length());
+      curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers); 
+
+      CURLcode res = curl_easy_perform(curl);
+      if(res != CURLE_OK)
+	fprintf(stderr, "curl_easy_perform() failed: %s\n",
+		curl_easy_strerror(res));
+ 
+    }
     
-        imshow("orig", imgFlip);
+    imshow("orig", imgFlip);
     }
     return 0;
 }
